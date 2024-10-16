@@ -1,3 +1,4 @@
+local sharedConfig = require 'config.shared'
 local BoardCoords = vec4(-44.19, -585.99, 87.71, 250.0)
 local BoardModel = `tr_prop_tr_planning_board_01a`
 local RenderTarget = 'modgarage_01'
@@ -105,16 +106,16 @@ local function SetupScaleform()
     for i = StartingPoint, StartingPoint + 2 do
         ScaleformMovieMethodAddParamTextureNameString(string.format('selection%s', i))
         BeginTextCommandScaleformString('STRING')
-        AddTextComponentSubstringPlayerName(ApartmentOptions[i].label)
+        AddTextComponentSubstringPlayerName(sharedConfig.apartmentOptions[i].label)
         EndTextCommandScaleformString()
         BeginTextCommandScaleformString('STRING')
-        AddTextComponentSubstringPlayerName(ApartmentOptions[i].description)
+        AddTextComponentSubstringPlayerName(sharedConfig.apartmentOptions[i].description)
         EndTextCommandScaleformString()
         ScaleformMovieMethodAddParamInt(0)
     end
 
     BeginTextCommandScaleformString('STRING')
-    AddTextComponentSubstringPlayerName(string.format('%s/%s', currentButtonID, #ApartmentOptions))
+    AddTextComponentSubstringPlayerName(string.format('%s/%s', currentButtonID, #sharedConfig.apartmentOptions))
     EndTextCommandScaleformString()
 
     ScaleformMovieMethodAddParamInt(0)
@@ -168,33 +169,37 @@ function ManagePlayer()
     end)
 end
 
+local function inputConfirm(apartmentIndex)
+    DoScreenFadeOut(500)
+    while not IsScreenFadedOut() do Wait(0) end
+    FreezeEntityPosition(cache.ped, false)
+    SetEntityCoords(cache.ped, sharedConfig.apartmentOptions[apartmentIndex].enter.x, sharedConfig.apartmentOptions[apartmentIndex].enter.y, sharedConfig.apartmentOptions[apartmentIndex].enter.z - 2.0, false, false, false, false)
+    Wait(0)
+    TriggerServerEvent('qbx_properties:server:apartmentSelect', apartmentIndex)
+    Wait(1000) -- Wait for player to spawn correctly so clothing menu can load in nice
+    TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
+    TriggerEvent('QBCore:Client:OnPlayerLoaded')
+end
+
 local function InputHandler()
     while true do
         if IsControlJustReleased(0, 188) then
             currentButtonID -= 1
-            if currentButtonID < 1 then currentButtonID = #ApartmentOptions end
+            if currentButtonID < 1 then currentButtonID = #sharedConfig.apartmentOptions end
             SetupScaleform()
         elseif IsControlJustReleased(0, 187) then
             currentButtonID += 1
-            if currentButtonID > #ApartmentOptions then currentButtonID = 1 end
+            if currentButtonID > #sharedConfig.apartmentOptions then currentButtonID = 1 end
             SetupScaleform()
         elseif IsControlJustReleased(0, 191) then
             local alert = lib.alertDialog({
                 header = locale('alert.apartment_selection'),
-                content = string.format(locale('alert.are_you_sure'), ApartmentOptions[currentButtonID].label),
+                content = string.format(locale('alert.are_you_sure'), sharedConfig.apartmentOptions[currentButtonID].label),
                 centered = true,
                 cancel = true
             })
             if alert == 'confirm' then
-                DoScreenFadeOut(500)
-                while not IsScreenFadedOut() do Wait(0) end
-                FreezeEntityPosition(cache.ped, false)
-                SetEntityCoords(cache.ped, ApartmentOptions[currentButtonID].enter.x, ApartmentOptions[currentButtonID].enter.y, ApartmentOptions[currentButtonID].enter.z - 2.0, false, false, false, false)
-                Wait(0)
-                TriggerServerEvent('qbx_properties:server:apartmentSelect', currentButtonID)
-                Wait(1000) -- Wait for player to spawn correctly so clothing menu can load in nice
-                TriggerServerEvent('QBCore:Server:OnPlayerLoaded')
-                TriggerEvent('QBCore:Client:OnPlayerLoaded')
+                inputConfirm(currentButtonID)
                 break
             end
         end
@@ -204,6 +209,10 @@ local function InputHandler()
 end
 
 RegisterNetEvent('apartments:client:setupSpawnUI', function()
+    if #sharedConfig.apartmentOptions == 1 then
+        inputConfirm(1)
+        return
+    end
     Wait(400)
     ManagePlayer()
     SetupCamera(true)
